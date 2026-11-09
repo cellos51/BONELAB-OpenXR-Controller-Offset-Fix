@@ -62,7 +62,9 @@
 #include <string.h>
 
 #include "main.h"
+#ifndef NO_GUI
 #include "gui.h"
+#endif
 
 // uses https://github.com/MartinWeigel/Quaternion for quaternions because i suck at math
 #include "Quaternion.h"
@@ -100,13 +102,13 @@ double offset_rotation_right_x = 0.0;
 double offset_rotation_right_y = 0.0;
 double offset_rotation_right_z = 0.0;
 
-double offset_position_left_x = 0.0;
-double offset_position_left_y = 0.0;
-double offset_position_left_z = 0.0;
+double offset_position_left_x = 0.010;
+double offset_position_left_y = -0.050;
+double offset_position_left_z = -0.030;
 
-double offset_position_right_x = 0.0;
-double offset_position_right_y = 0.0;
-double offset_position_right_z = 0.0;
+double offset_position_right_x = -0.010;
+double offset_position_right_y = -0.050;
+double offset_position_right_z = -0.030;
 
 // those are not constant, and will be corrected by xrStringToPath as needed.
 XrPath id_user_hand_left = 9;
@@ -187,7 +189,7 @@ int read_config(char *config_file)
 
   if (!arq)
   {
-    log_message("Could not find my config file at:%s!\n We are trying to run with default offsets now(all zeroes)\n", config_file);
+    log_message("Could not find my config file at:%s!\n Using the built-in BONELAB offsets and writing a new config.\n", config_file);
     write_config(config_file); // write a new config file
     return 1;
   }
@@ -317,7 +319,7 @@ int write_config(const char *config_file)
   FILE *arq = fopen(config_file, "w");
   if (arq)
   {
-    fprintf(arq, "#offsets here are written in degrees!\n");
+    fprintf(arq, "#Rotation offsets are in degrees; position offsets are in meters.\n");
     fprintf(arq, "left_hand_rotation_offset_x=%f\n", radToDeg(offset_rotation_left_x));
     fprintf(arq, "left_hand_rotation_offset_y=%f\n", radToDeg(offset_rotation_left_y));
     fprintf(arq, "left_hand_rotation_offset_z=%f\n", radToDeg(offset_rotation_left_z));
@@ -836,19 +838,22 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
     assign_jump("xrWaitSwapchainImage",(PFN_xrVoidFunction) xrWaitSwapchainImage);
     */
 
+#ifndef NO_GUI
     // launch the gui thread
-
     thread_gui_data *gui_stuff = (thread_gui_data *)malloc(sizeof(thread_gui_data));
     strncpy(gui_stuff->config_fp, config_file_path, sizeof(gui_stuff->config_fp) - 1);
     gui_stuff->config_fp[sizeof(gui_stuff->config_fp) - 1] = 0;
 
     launch_gui_thread(gui_stuff);
+#endif
   }
 
   if (reason == DLL_PROCESS_DETACH)
   {
     log_message("--- DLL_PROCESS_DETACH, end of log ---");
+#ifndef NO_GUI
     kill_gui();
+#endif
     log_close();
     free(jump_table);
     free(jump_table_names);
@@ -1902,7 +1907,9 @@ int main()
   exit(0);
   */
 
+#ifndef NO_GUI
   launch_gui_thread(NULL);
+#endif
 
   while (1)
   {

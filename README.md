@@ -38,7 +38,7 @@ the makefile has a target named "dll_release" that produces the desired, require
 
 This checkout is based on [aruametello/openxr_loader-dll-proxy](https://github.com/aruametello/openxr_loader-dll-proxy). In `xrLocateSpace`, position offsets are rotated by the incoming tracked hand orientation using OpenXR's X-Y-Z component order before being added to each hand pose. This makes position-only offsets controller-local. Configured rotation offsets continue to affect orientation as before.
 
-For the tested BONELAB setup, configure both `left_hand_position_offset_y` and `right_hand_position_offset_y` to `-0.050800` in the game's `openxr_loader_config.txt`. The build in `obj/Release/openxr_loader.dll` is the proxy DLL; install it as `openxr_loader.dll` beside `original_openxr_loader.dll`.
+For the tested BONELAB setup, the default config uses left position offsets `(0.010, -0.050, -0.030)` m, right position offsets `(-0.010, -0.050, -0.030)` m, and zero rotation offsets. If the config file is missing, the proxy writes these defaults. Both Release DLL variants can be built with `make dll_release`; the GUI version is at `obj/Release-GUI/openxr_loader.dll` and the config-only version is at `obj/Release-ConfigOnly/openxr_loader.dll`. Install only one at a time, named `openxr_loader.dll`, beside `original_openxr_loader.dll`.
 
 ### Authorship
 

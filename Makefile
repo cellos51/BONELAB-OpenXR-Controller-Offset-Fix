@@ -1,24 +1,31 @@
 CC := gcc
 
 TARGET_NAME := openxr_loader.dll
-TARGET_DEBUG = $(OBJDIR_DEBUG)/$(TARGET_NAME)
-TARGET_RELEASE = $(OBJDIR_RELEASE)/$(TARGET_NAME)
-
-SRC := src/gui.c src/main.c src/Quaternion.c
 DEF_FILE := src/openxr_loader.def
 
+SRC_GUI := src/gui.c src/main.c src/Quaternion.c
+SRC_CONFIG_ONLY := src/main.c src/Quaternion.c
+
 OBJDIR_DEBUG := obj/Debug
-OBJDIR_RELEASE := obj/Release
+OBJDIR_RELEASE_GUI := obj/Release-GUI
+OBJDIR_RELEASE_CONFIG_ONLY := obj/Release-ConfigOnly
+OBJDIR_LAYER_DEMO := obj/LayerDemo
 
-OBJ_DEBUG := $(SRC:%.c=$(OBJDIR_DEBUG)/%.o)
-OBJ_RELEASE := $(SRC:%.c=$(OBJDIR_RELEASE)/%.o)
+OBJ_DEBUG := $(SRC_GUI:%.c=$(OBJDIR_DEBUG)/%.o)
+OBJ_RELEASE_GUI := $(SRC_GUI:%.c=$(OBJDIR_RELEASE_GUI)/%.o)
+OBJ_RELEASE_CONFIG_ONLY := $(SRC_CONFIG_ONLY:%.c=$(OBJDIR_RELEASE_CONFIG_ONLY)/%.o)
+OBJ_LAYER_DEMO := $(OBJDIR_LAYER_DEMO)/src/openxr_layer_demo.o
 
-# Override these when needed, for example:
-# make dll_release OPENXR_INCLUDE="/ucrt64/include" OPENXR_LIB="/ucrt64/lib" RELEASE_OUTPUT_DLL="/c/Path With Spaces/openxr_loader.dll"
+TARGET_DEBUG := $(OBJDIR_DEBUG)/$(TARGET_NAME)
+TARGET_RELEASE_GUI := $(OBJDIR_RELEASE_GUI)/$(TARGET_NAME)
+TARGET_RELEASE_CONFIG_ONLY := $(OBJDIR_RELEASE_CONFIG_ONLY)/$(TARGET_NAME)
+TARGET_LAYER_DEMO := $(OBJDIR_LAYER_DEMO)/openxr_api_layer_demo.dll
+
 OPENXR_INCLUDE ?=
 OPENXR_LIB ?=
 DEBUG_OUTPUT_DLL ?=
 RELEASE_OUTPUT_DLL ?=
+CONFIG_ONLY_OUTPUT_DLL ?=
 
 CSTD := -std=c11
 COMMON_WARN := -Wall
@@ -43,9 +50,15 @@ OUT_DEBUG := $(DEBUG_OUTPUT_DLL)
 endif
 
 ifeq ($(strip $(RELEASE_OUTPUT_DLL)),)
-OUT_RELEASE := $(TARGET_RELEASE)
+OUT_RELEASE_GUI := $(TARGET_RELEASE_GUI)
 else
-OUT_RELEASE := $(RELEASE_OUTPUT_DLL)
+OUT_RELEASE_GUI := $(RELEASE_OUTPUT_DLL)
+endif
+
+ifeq ($(strip $(CONFIG_ONLY_OUTPUT_DLL)),)
+OUT_RELEASE_CONFIG_ONLY := $(TARGET_RELEASE_CONFIG_ONLY)
+else
+OUT_RELEASE_CONFIG_ONLY := $(CONFIG_ONLY_OUTPUT_DLL)
 endif
 
 LIBS := -lgdi32 -lkernel32 -lpsapi -luser32
@@ -53,52 +66,53 @@ LINK_COMMON := -shared -Wl,--dll -static-libstdc++ -static-libgcc -m64
 
 DEBUG_CFLAGS := $(COMMON_FLAGS) -O0 -g3
 RELEASE_CFLAGS := $(COMMON_FLAGS) -O2
+RELEASE_CONFIG_ONLY_CFLAGS := $(RELEASE_CFLAGS) -DNO_GUI
 LAYER_DEMO_CFLAGS := $(COMMON_FLAGS) -O0 -g3
 
-LAYER_DEMO_SRC := src/openxr_layer_demo.c
-LAYER_DEMO_OBJDIR := obj/LayerDemo
-LAYER_DEMO_OBJ := $(LAYER_DEMO_OBJDIR)/src/openxr_layer_demo.o
-LAYER_DEMO_TARGET := $(LAYER_DEMO_OBJDIR)/openxr_api_layer_demo.dll
-
-.PHONY: all dll_debug dll_release layer_demo clean
+.PHONY: all dll_debug dll_release dll_release_gui dll_release_config_only layer_demo clean
 
 all: dll_release
 
 dll_debug: $(OUT_DEBUG)
 
-dll_release: $(OUT_RELEASE)
+dll_release: dll_release_gui dll_release_config_only
 
-layer_demo: $(LAYER_DEMO_TARGET)
+dll_release_gui: $(OUT_RELEASE_GUI)
 
-$(OBJDIR_DEBUG):
-	mkdir -p $(OBJDIR_DEBUG)
+dll_release_config_only: $(OUT_RELEASE_CONFIG_ONLY)
 
-$(OBJDIR_RELEASE):
-	mkdir -p $(OBJDIR_RELEASE)
+layer_demo: $(TARGET_LAYER_DEMO)
 
-$(LAYER_DEMO_OBJDIR):
-	mkdir -p $(LAYER_DEMO_OBJDIR)
+$(OBJDIR_DEBUG) $(OBJDIR_RELEASE_GUI) $(OBJDIR_RELEASE_CONFIG_ONLY) $(OBJDIR_LAYER_DEMO):
+	mkdir -p $@
 
 $(OBJDIR_DEBUG)/%.o: %.c | $(OBJDIR_DEBUG)
 	mkdir -p $(dir $@)
 	$(CC) $(DEBUG_CFLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 
-$(OBJDIR_RELEASE)/%.o: %.c | $(OBJDIR_RELEASE)
+$(OBJDIR_RELEASE_GUI)/%.o: %.c | $(OBJDIR_RELEASE_GUI)
 	mkdir -p $(dir $@)
 	$(CC) $(RELEASE_CFLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 
-$(LAYER_DEMO_OBJDIR)/%.o: %.c | $(LAYER_DEMO_OBJDIR)
+$(OBJDIR_RELEASE_CONFIG_ONLY)/%.o: %.c | $(OBJDIR_RELEASE_CONFIG_ONLY)
+	mkdir -p $(dir $@)
+	$(CC) $(RELEASE_CONFIG_ONLY_CFLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+
+$(OBJDIR_LAYER_DEMO)/%.o: %.c | $(OBJDIR_LAYER_DEMO)
 	mkdir -p $(dir $@)
 	$(CC) $(LAYER_DEMO_CFLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 
 $(OUT_DEBUG): $(OBJ_DEBUG) $(DEF_FILE)
 	$(CC) $(LINK_COMMON) $(LIB_DIR_FLAGS) $(OBJ_DEBUG) $(DEF_FILE) -o "$@" $(LIBS)
 
-$(OUT_RELEASE): $(OBJ_RELEASE) $(DEF_FILE)
-	$(CC) $(LINK_COMMON) $(LIB_DIR_FLAGS) $(OBJ_RELEASE) $(DEF_FILE) -o "$@" -s $(LIBS)
+$(OUT_RELEASE_GUI): $(OBJ_RELEASE_GUI) $(DEF_FILE)
+	$(CC) $(LINK_COMMON) $(LIB_DIR_FLAGS) $(OBJ_RELEASE_GUI) $(DEF_FILE) -o "$@" -s $(LIBS)
 
-$(LAYER_DEMO_TARGET): $(LAYER_DEMO_OBJ)
-	$(CC) $(LINK_COMMON) $(LIB_DIR_FLAGS) $(LAYER_DEMO_OBJ) -o "$@"
+$(OUT_RELEASE_CONFIG_ONLY): $(OBJ_RELEASE_CONFIG_ONLY) $(DEF_FILE)
+	$(CC) $(LINK_COMMON) $(LIB_DIR_FLAGS) $(OBJ_RELEASE_CONFIG_ONLY) $(DEF_FILE) -o "$@" -s $(LIBS)
+
+$(TARGET_LAYER_DEMO): $(OBJ_LAYER_DEMO)
+	$(CC) $(LINK_COMMON) $(LIB_DIR_FLAGS) $(OBJ_LAYER_DEMO) -o "$@"
 
 clean:
 	rm -rf obj
